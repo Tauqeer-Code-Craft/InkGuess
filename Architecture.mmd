@@ -1,0 +1,29 @@
+flowchart TD
+
+%% CLIENT
+A[React Frontend - TypeScript] -->|Socket.IO| B[API Gateway / NestJS Backend]
+
+%% SOCKET LAYER
+B --> C[Socket.IO Gateway]
+
+%% GAME LOGIC
+C --> D[Game Service]
+D --> E[Room Manager]
+D --> F[Drawing Engine]
+D --> G[Word Engine]
+D --> H[Score Engine]
+D --> I[Hint Engine]
+D --> J[Timer Engine]
+
+%% REDIS LAYER
+E --> R1[(Redis - Room State)]
+F --> R2[(Redis - Strokes)]
+G --> R3[(Redis - Current Word)]
+H --> R4[(Redis - Scores)]
+I --> R5[(Redis - Revealed Letters)]
+
+%% PUB/SUB (SCALING)
+B <-->|Socket.IO Redis Adapter| R6[(Redis Pub/Sub)]
+
+%% CLIENT UPDATES
+C -->|events| A
