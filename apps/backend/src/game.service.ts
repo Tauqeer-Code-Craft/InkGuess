@@ -37,7 +37,7 @@ export class GameService{
 
     async createRoom(isPublic = false): Promise<String>{
         let code = this.generateRoomCode();
-        // 
+        // Ensure uniqueness
         let exists = await this.roomExists(code);
         while (exists) {
             code = this.generateRoomCode();
@@ -58,11 +58,11 @@ export class GameService{
             status: 'lobby',
             wordOptions: [],
         };
+
         await this.saveRoomState(code,roomState);
         await this.redisService.sadd('rooms',code);
         return code;
     }
-
 
     async roomExists(roomCode: string): Promise<boolean>{
         const state = await this.getRoomState(roomCode);
@@ -179,6 +179,7 @@ export class GameService{
         room.round = 1;
         room.turnIndex = 0;
         room.status = 'selecting';
+
         await this.startTurn(room);
     } 
 
@@ -244,7 +245,6 @@ export class GameService{
         },1000);
 
         this.activeTimers.set(roomCode,timerId);
-
     }
 
     async selectWord(roomCode: string, word: string): Promise<void>{
@@ -289,6 +289,120 @@ export class GameService{
 
         this.activeTimers.set(roomCode,timerId);
     } 
+
+    setUpHintTimers(roomCode: string, word: string) {
+        const timers : NodeJS.Timeout[] = [];
+        const len = word.length;
+
+        // we reveal hints at 15s , 30s, 45s
+        const revealTimes = [15,30,45]; //seconds
+
+        revealTimes.forEach((elapsed)=>{
+            const timeoutId = setTimeout(async () => {
+                const room = await this.getRoomState(roomCode);
+                if (!room || room.status !== 'drawing' || !room.currentWord) return;
+
+                // pick letters to reveal 
+                // we can reveal upto 3 letters
+                const revealCount = elapsed === 15 ? 1 : elapsed === 30 ? 2 : 3;
+                if (revealCount>len-1) return; // handle reveal
+                
+                // create a list of full indices
+                const indices : number [] = [];
+                for (let i = 0;i< len ; i++){
+                    if (word[i]!== ' ') indices.push(i);
+                }
+
+                // now deterministic or pseudo random selection of indices based on word
+                const seed = word.charCodeAt(0) + elapsed;
+                const revealIndices: number [] = [];
+                for (let r = 0; r<revealCount;r++){
+                    const idxIdx = (seed + r*7) % indices.length;
+                    const targetIndex = indices[idxIdx];
+                    if(!revealIndices.includes(targetIndex)){
+                        revealIndices.push(targetIndex);
+                    }
+                }
+
+                // Build hint string
+                let hintStr = '';
+                for (let i = 0;i<len;i++){
+                    if(word[i]=== ' '){
+                        hintStr += ' ';
+                    }else if(revealIndices.includes(i)){
+                        hintStr += `${word[i].toUpperCase()}`;
+                    }else{
+                        hintStr += '_ ';
+                    }
+                }
+
+                room.hint = hintStr.trim();
+                await this.saveRoomState(roomCode,room);
+                this.broadcastToRoom(roomCode,'hint-update',{hint:room.hint});
+            },elapsed * 1000);
+
+            timers.push(timeoutId);
+        });
+        this.hintTimers.set(roomCode,timers);
+    }
+
+    async handleGuess(roomCode: string,playerId:string,guess:string): Promise<boolean>{
+        const room = await this.getRoomState(roomCode);
+        if (!room || room.status !== 'drawing' || !room.currentWord) return false;
+
+        const player = room.players.find((p)=> p.id === playerId);
+        if (!player || player.isDrawer || player.hasGuessed) return false;
+
+        const cleanedGuess = guess.trim().toLowerCase();
+        if(cleanedGuess === room.currentWord){
+            player.hasGuessed = true;
+
+            // Scoring: base points 100 + remaining time * 2
+            const remainingTime = room.timer;
+            const points = 100 + remainingTime * 2;
+            player.score += points;
+            player.scoreAddedThisTurn = points;
+
+            // reward drawer: +30 points per correct guesser
+            const drawer = room.players.find((p)=>p.id == room.turnOwnerId);
+            if (drawer){
+                drawer.score +=30;
+                drawer.scoreAddedThisTurn += 30;
+            }
+
+            await this.saveRoomState(roomCode,room);
+
+            // Broadcast to room that player has guessed correctly
+            this.broadcastToRoom(roomCode,'chat-message',{
+                sender: 'System',
+                text: `${player.name} guessed the word!`,
+                type: 'correct',
+            });
+
+            this.broadcastToRoom(roomCode,'room-update',room)
+
+            // check if everyone has guessed
+            await this.checkedAllGuessed(roomCode)
+            return true;
+        }
+
+        return false;
+
+    }
+
+    async checkedAllGuessed (roomCode: string): Promise<void> {
+        const room = await this.getRoomState(roomCode);
+        if (!room || room.status !== 'drawing') return;
+
+        // guesses needed are for all players except drawer
+        const guessers = room.players.filter((p)=>p.id !== room.turnOwnerId);
+        const correctGuessers = guessers.filter((p)=> p.hasGuessed);
+
+        if (guessers.length > 0 && correctGuessers.length === guessers.length){
+            this.clearRoomTimers(roomCode);
+            await this.endTurn(roomCode);
+        }
+    }
 
     async endTurn(roomCode: string): Promise<void>{
         const room = await this.getRoomState(roomCode);
@@ -342,7 +456,61 @@ export class GameService{
         });
     }
 
-    // there is need for reset room , handle guess , setupHint timer etc , in the next video
+    async resetRoom(roomCode: string): Promise <RoomState | null>{
+        const room = await this.getRoomState(roomCode)
+        if (!room ) return null;
+
+        this.clearRoomTimers(roomCode);
+        room.isPlaying = false;
+        room.round = 1;
+        room.turnIndex= 0;
+        room.turnOwnerId = null;
+        room.currentWord = null;
+        room.hint = '';
+        room.timer = 0;
+        room.status = 'lobby';
+        room.wordOptions = [];
+
+        // Reset scores
+        room.players.forEach((p)=>{
+            p.score = 0;
+            p.hasGuessed = false;
+            p.isDrawer = false;
+            p.scoreAddedThisTurn = 0;
+        });
+
+        await this.saveRoomState(roomCode,room);
+        await this.clearStrokes(roomCode);
+        return room;
+    }
+
+    async undoStroke(roomCode: string,playerId: string): Promise <void>{
+        const room = await this.getRoomState(roomCode);
+        if (!room || room.status !== 'drawing' || room.turnOwnerId !== playerId) return;
+
+        const strokes = await this.getStrokes(roomCode);
+        if(strokes.length > 0){
+            strokes.pop();
+            await this.redisService.set(this.getStrokesKey(roomCode),JSON.stringify(strokes));
+            this.broadcastToRoom(roomCode,'canvas-sync',strokes);
+        }
+    }
+
+    async fillCanvas(roomCode: string, playerId: string, color: string): Promise<void>{
+        const room = await this.getRoomState(roomCode);
+        if (!room || room.status !== 'drawing' || room.turnOwnerId !== playerId) return;
+
+        const fillStroke: StrokeData = {
+            points: [],
+            color,
+            width: 0,
+            isDrawing: false,
+            isFill: true
+        };
+
+        await this.addStroke(roomCode,fillStroke);
+        this.broadcastToRoom(roomCode,'draw-stroke',fillStroke);
+    }
 
     private clearRoomTimers(roomCode: string){
         // clear main loop timer
