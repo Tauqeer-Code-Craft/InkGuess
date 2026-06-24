@@ -1,7 +1,8 @@
 import { useEffect } from 'react'
+import { useGameStore } from './store/useGameStore';
 
 const App = () => {
-  const roomCode = "abcd"; // useGameStore()
+  const roomCode = useGameStore((state)=> state.roomCode)
 
   useEffect(()=>{
     // Socket.connect() we need to first create the socket client
@@ -12,7 +13,8 @@ const App = () => {
     const savedToken = sessionStorage.getItem('inkguess_session_token');
 
     if(savedCode && savedName && savedToken){
-      // if all these exist already then directly set them to store 
+      useGameStore.getState().setPlayerName(savedName);
+      useGameStore.getState().setRoomCode(savedCode);
     }
 
     return()=>{
