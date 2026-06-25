@@ -1,11 +1,13 @@
 import { useEffect } from 'react'
 import { useGameStore } from './store/useGameStore';
+import { socketService } from './sockets/socketService';
 
 const App = () => {
   const roomCode = useGameStore((state)=> state.roomCode)
 
   useEffect(()=>{
     // Socket.connect() we need to first create the socket client
+    socketService.connect();
 
     // check if there is an active session
     const savedCode = sessionStorage.getItem('inkguess_room_code'); 
@@ -19,7 +21,7 @@ const App = () => {
 
     return()=>{
       // Disconnect when app unmounts
-      // socket we need to this after socket setup
+      socketService.disconnect();
     }
   },[]);
 
