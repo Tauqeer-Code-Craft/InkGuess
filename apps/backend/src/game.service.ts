@@ -343,6 +343,7 @@ export class GameService{
 
             timers.push(timeoutId);
         });
+
         this.hintTimers.set(roomCode,timers);
     }
 
@@ -387,7 +388,6 @@ export class GameService{
         }
 
         return false;
-
     }
 
     async checkedAllGuessed (roomCode: string): Promise<void> {
@@ -426,6 +426,7 @@ export class GameService{
                 await this.nextTurn(currentRoom);
             }
         },3000);
+
         this.activeTimers.set(roomCode,timeoutId);
     }
 
@@ -507,7 +508,6 @@ export class GameService{
             isDrawing: false,
             isFill: true
         };
-
         await this.addStroke(roomCode,fillStroke);
         this.broadcastToRoom(roomCode,'draw-stroke',fillStroke);
     }
