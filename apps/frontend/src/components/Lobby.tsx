@@ -45,6 +45,7 @@ const Lobby: React.FC = () => {
         }
         setError(null);
         setCheckingRoom(true);
+
         try {
             const code = codeInput.trim().toUpperCase();
             const res = await checkRoomExists(code);
@@ -63,14 +64,14 @@ const Lobby: React.FC = () => {
         }
     };
 
-
   return (
     <div className='glass-panel animate-slide-up' style={{maxWidth: '480px', width: '100%', margin: '0 auto'}} >
         <h1 className='logo'>Inkguess</h1>
-        <p style={{color: 'var(--text-secondary)', marginBottom: '2rem'}} >Draw, Guess, and Win! Real-time multiplayer sketching.</p>
+        <p style={{color: 'var(--text-secondary)', marginBottom: '2rem'}}>
+            Draw, Guess, and Win! Real-time multiplayer sketching.
+        </p>
 
-        {
-            error && (
+        {error && (
                 <div
                     style={{background: 'rgba(239, 68, 68, 0.15)',
                         border: '1px solid rgba(239, 68, 68, 0.4)',
@@ -81,15 +82,16 @@ const Lobby: React.FC = () => {
                         fontSize: '0.9rem',
                         textAlign: 'left'
                     }}
-                >{error}</div>
-            )
-        }
+                >{error}
+                </div>
+        )}
 
         <div style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}} >
             <div>
                 <label
-                style={{display: 'block',textAlign:'left',marginBottom:'0.5rem',fontWeight: 600, fontSize: '0.9rem'}}
-                >YOUR NAME</label>
+                style={{display: 'block',textAlign:'left',marginBottom:'0.5rem',fontWeight: 600, fontSize: '0.9rem'}}>
+                YOUR NAME
+                </label>
                 <input type="text"
                 className='text-input'
                 placeholder='e.g SketchMaster'
@@ -101,34 +103,29 @@ const Lobby: React.FC = () => {
 
             {/* dividers */}
             <div style={{ height: '1px', background: 'rgba(139,92,246,0.1)'}}/>
-                <div style={{ display: 'flex', flexDirection: 'column',gap: '1rem' }}>
-                    <button
+            <div style={{ display: 'flex', flexDirection: 'column',gap: '1rem' }}>
+                <button
                     className='btn-primary'
                     onClick={handleCreateRoom}
-                    disabled= {createRoomMutation.isPending || !nameInput.trim()}>
+                    disabled= {createRoomMutation.isPending || !nameInput.trim()}
+                >
                     {createRoomMutation.isPending? 'Creating Room...': 'Create Private Room'}
-                    </button>
+                </button>
 
+                <div style={{
+                    display:'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '10px',
+                    color: 'var(--text-muted)',
+                    fontSize: '0.85rem'
+                }}>
+                    <span style={{width: '40px',height: '1px', background: 'rgba(255,255,255,0.1'}}></span>
+                    OR JOIN EXISTING
+                    <span style={{width: '40px',height: '1px', background: 'rgba(255,255,255,0.1'}}></span>
+                </div>
 
-                    <div style={{
-                        display:'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '10px',
-                        color: 'var(--text-muted)',
-                        fontSize: '0.85rem'
-                    }}>
-                        <span style={{width: '40px',height: '1px', background: 'rgba(255,255,255,0.1'}}></span>
-                        OR JOIN EXISTING
-                        <span style={{width: '40px',height: '1px', background: 'rgba(255,255,255,0.1'}}></span>
-                    </div>
-
-                    <form onSubmit={handleJoinRoom}
-                    style={{
-                        display: 'flex',
-                        gap: '0.5rem'
-                    }}
-                    >
+                <form onSubmit={handleJoinRoom} style={{ display: 'flex', gap: '0.5rem'}}>
                         <input 
                         type="text" 
                         className='text-input'
@@ -136,12 +133,7 @@ const Lobby: React.FC = () => {
                         maxLength={4} 
                         value={codeInput}
                         onChange={(e)=>setCodeInput(e.target.value.toUpperCase())}
-                        style={{
-                            flex: 1,
-                            textTransform: 'uppercase',
-                            textAlign: 'center',
-                            letterSpacing: '2px'
-                        }}
+                        style={{flex: 1,textTransform: 'uppercase',textAlign: 'center',letterSpacing: '2px'}}
                         />
 
                         <button
@@ -151,14 +143,11 @@ const Lobby: React.FC = () => {
                         style={{padding: '0.75rem 1.25rem'}}>
                         {checkingRoom ? 'Checking...' : 'Join'}
                         </button>
-                    </form>
-                </div>
+                </form>
+            </div>
         </div>
-
     </div>
   )
 }
 
 export default Lobby
-
-
